@@ -1,50 +1,74 @@
-var path = require("path");
-var express = require("express");
-var socket = require("socket.io");
-var app = express();
+const path = require("path");
+const express = require("express");
+const socket = require("socket.io");
+const app = express();
 
-app.use(express.static("client"));
+app.use(express.static("public"));
 app.get("/", function(req, res) {
-  res.sendFile(__dirname + "/client/index.html");
+  res.sendFile(__dirname + "/public/index.html");
 });
 app.get("/game", function(req, res) {
-  res.sendFile(__dirname + "/client/game.html");
+  res.sendFile(__dirname + "/public/game.html");
 });
 
-var server = app.listen(8081, function() {
+const server = app.listen(8081, function() {
   console.log("Hosted at http://localhost:8081");
 });
 
 // socket
-var gameIo = socket(server);
+const io = socket(server);
 // counter
-var connectCounter = 0;
+var connectedCounter = 0;
 
-gameIo.on("connection", function(socket) {
+var playerList = [];
+
+const gameState = {
+  players: {}
+};
+
+function ShipBluePrint(id, x, y) {
+  this.id = id;
+  this.xPosition = x;
+  this.yPosition = y;
+}
+
+io.on("connection", function(socket) {
   // counter operation - Adding to counter
-  connectCounter++;
+  //
+  connectedCounter++;
   // emitting player status
-  gameIo.sockets.emit("newConnection", {
+  io.sockets.emit("newConnection", {
     playerId: socket.id,
-    playerCounter: connectCounter
+    playerCounter: connectedCounter
   });
   // local console :DEBUG
   console.log(
-    `Players-Count: ${connectCounter}, Player:${socket.id} Connected, `
+    `Players-Count: ${connectedCounter}, Player:${socket.id} Connected, `
   );
+
+  //start
+  socket.on("newPlayer", function(data) {
+    gameState.players[socket.id] = {
+      xPosition: data.xPosition,
+      yPosition: data.yPosition
+    };
+    console.log(gameState.players);
+  });
 
   // disconnection
   socket.on("disconnect", function() {
+    delete gameState.players[socket.id];
     // counter operation
-    connectCounter--;
+    connectedCounter--;
     // emitting player status
-    gameIo.sockets.emit("disconnect", {
+    io.sockets.emit("disconnect", {
       playerId: socket.id,
-      playerCounter: connectCounter
+      playerCounter: connectedCounter
     });
     // local console :DEBUG
     console.log(
-      `Players-Count: ${connectCounter}, Player:${socket.id} Disconnected,`
+      `Players-Count: ${connectedCounter}, Player:${socket.id} Disconnected,`
     );
+    console.log(gameState.players);
   });
 });

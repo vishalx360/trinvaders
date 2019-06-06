@@ -1,13 +1,20 @@
 var ClientSocket = io.connect("http://localhost:8081/");
-
-function sendUpdate(x, y, rotation) {
-  ClientSocket.emit("movement", {
-    xPosition: x,
-    yPosition: y,
-    shipRotation: rotation
-  });
+// for server to keep list of players
+function ShipBluePrint() {
+  (this.shipId = "as"),
+    (this.xPosition = x),
+    (this.yPosition = y),
+    (this.shipRotation = rotation);
 }
-// gameLog
+
+// function sendUpdate(x, y, rotation) {
+//   ClientSocket.brodcast("start", {
+//     xPosition: x,
+//     yPosition: y,
+//     shipRotation: rotation
+//   });
+// }
+// gameLog ELEMENTS
 var log = document.getElementById("log");
 var counter = document.getElementById("playerCounter");
 
