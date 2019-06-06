@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>TRI-INVADERS</title>
+    <link rel="shortcut icon" href="favicon.png" type="image/x-icon">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.dev.js"></script>
+
+
+    <style>
+        * {
+            margin: 0px;
+            padding: 0px
+        }
+
+        html {
+            background-color: black;
+        }
+
+        #joystick {
+            position: fixed;
+            bottom: 0px;
+            display: flex;
+            width: 100%;
+            align-items: center;
+            justify-content: space-around;
+            /* DEBUG */
+            display: none
+        }
+
+        #joystick img {
+            height: 60px;
+            padding: 10px;
+        }
+
+
+
+
+        #joystick button {
+            background: transparent;
+            border: none;
+            outline: none;
+        }
+
+        #joystick button:active {
+
+            transform: scale(1.05)
+        }
+
+        #log {
+            font-family: monospace;
+            position: fixed;
+            bottom: 30px;
+            left: 10px;
+            color: rgba(255, 255, 255, 0.719);
+            background: rgba(255, 255, 255, 0.103);
+        }
+
+        #counterDiv {
+            font-family: monospace;
+            position: fixed;
+            font-size: 1.5em;
+            top: 100px;
+            left: 5px;
+            color: rgb(49, 49, 255)
+        }
+    </style>
+
+
+
+</head>
+
+<body>
+
+    <ul id="log">
+
+    </ul>
+    <div id="counterDiv">
+        <p>Connected Players:
+            <span id="playerCounter"></span>
+        </p>
+    </div>
+    <div id="joystick">
+
+        <span>
+            <button id="left"> <img src="assets/left.png" alt=""></button>
+            <button id="right"> <img src="assets/right.png" alt=""></button>
+
+        </span>
+        <span>
+            <button id="up"><img src="assets/up.png" alt=""></button>
+        </span>
+    </div>
+
+    <script src="node_modules/phaser/dist/phaser.js"></script>
+    <script src="src/log.js"></script>
+    <script src="src/app.js"></script>
+
+
+</body>
+
+</html>

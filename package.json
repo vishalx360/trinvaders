@@ -1,0 +1,20 @@
+{
+  "name": "trinvaders",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "ejs": "^2.6.1",
+    "express": "^4.16.4",
+    "socket.io": "^2.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "*"
+  },
+  "keywords": [],
+  "author": "vishalx360@gmail.com",
+  "license": "MIT",
+  "description": "game"
+}

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1, minimum-scale=1, user-scalable=no" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>TRI-INVADERS</title>
+    <link rel="shortcut icon" href="favicon.png" type="image/x-icon">
+
+</head>
+
+<style>
+    * {
+        margin: 0px;
+        padding: 0px;
+        box-sizing: border-box;
+    }
+
+    html {
+        background-color: black;
+        color: white;
+    }
+
+    body {
+        font-family: 'Courier New', Courier, monospace;
+    }
+
+    #container {
+        height: 100vh
+    }
+
+    #title {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+    }
+
+
+
+    #btnDiv {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+
+    }
+
+    .btn {
+        font-family: monospace;
+        padding: 10px 15px;
+        background: white;
+        color: black;
+        border-radius: 25px;
+        border: none;
+        outline: none;
+        text-align: center;
+        margin: 10px;
+    }
+
+    .btn:hover {
+        transform: scale(1.05)
+    }
+
+    .btn:active {
+        transform: scale(0.9)
+    }
+</style>
+
+<body>
+    <div id="container">
+        <div id="title">
+            <h1>TRINVADERS</h1>
+            <p>the game only legends play</p>
+        </div>
+        <div id="btnDiv">
+            <a href="/game"><button class="btn">PLAY</button></a>
+            <a href="#"><button class="btn">HOW TO PLAY</button></a>
+
+        </div>
+    </div>
+</body>
+
+</html>
