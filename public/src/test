@@ -1,0 +1,9 @@
+myShip = this.physics.add.sprite(player.xPosition, player.yPosition, "ship");
+  myShip.setDamping(true);
+  myShip.angle = -90;
+  myShip.setDrag(0.95);
+  myShip.setMaxVelocity(200);
+
+
+  Math.floor(Math.random() * Math.floor(500)),
+      Math.floor(Math.random() * Math.floor(500)),

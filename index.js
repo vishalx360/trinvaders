@@ -20,17 +20,9 @@ const io = socket(server);
 // counter
 var connectedCounter = 0;
 
-var playerList = [];
-
 const gameState = {
   players: {}
 };
-
-function ShipBluePrint(id, x, y) {
-  this.id = id;
-  this.xPosition = x;
-  this.yPosition = y;
-}
 
 io.on("connection", function(socket) {
   // counter operation - Adding to counter
@@ -69,6 +61,8 @@ io.on("connection", function(socket) {
     console.log(
       `Players-Count: ${connectedCounter}, Player:${socket.id} Disconnected,`
     );
-    console.log(gameState.players);
   });
 });
+setInterval(() => {
+  io.sockets.emit("state", gameState);
+}, 1000 / 60);
