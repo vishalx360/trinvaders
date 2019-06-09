@@ -2,6 +2,17 @@
 var UIlog = document.getElementById("log");
 var UIcounter = document.getElementById("playerCounter");
 var UIplayerListDiv = document.getElementById("playerListDiv");
+var UIstatus = document.getElementById("status");
+
+UIstatus.addEventListener("change", function() {
+  if (this.checked) {
+    console.log("checked");
+    ClientSocket.emit("status", true);
+  } else {
+    console.log("not checked");
+    ClientSocket.emit("status", false);
+  }
+});
 
 let gameState = {
   lobbyState: {
@@ -31,10 +42,21 @@ ClientSocket.emit("newPlayer", {
 function updateLobbyUi(state) {
   var items = "";
 
-  function addPlayer(player, username) {
+  function addPlayer(player, username, status) {
     //template
+    var newStatus;
+    if (status) {
+      newStatus = "ready";
+    } else {
+    }
     var playerNode =
-      "<li><h2>" + username + "</h2><h3>" + player + "</h3></li>";
+      "<li><h2 class='" +
+      newStatus +
+      "'>" +
+      username +
+      "</h2><h3>" +
+      player +
+      "</h3></li>";
 
     items += playerNode;
   }
@@ -43,7 +65,11 @@ function updateLobbyUi(state) {
 
   for (player in lobbyPlayers) {
     var currentPlayer = lobbyPlayers[player];
-    addPlayer(currentPlayer, state.players[currentPlayer].username);
+    addPlayer(
+      currentPlayer,
+      state.players[currentPlayer].username,
+      state.players[currentPlayer].status
+    );
   }
 
   var playerList = "<ul>" + items + "</ul>";

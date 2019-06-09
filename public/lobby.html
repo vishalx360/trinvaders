@@ -89,6 +89,10 @@
         margin: 10px;
         caret-color: rgb(0, 182, 70);
     }
+
+    .ready {
+        color: #4caf50
+    }
 </style>
 
 <body>
@@ -106,15 +110,11 @@
     <div>
         <p>Connected Players:<span id="playerCounter">0</span></p>
     </div>
-    <div id="playerListDiv">
-        <ul>
-            <li>
-                <h2>Vishal</h2>
-                <h3>yurgguht6</h3>
-            </li>
-        </ul>
+    <div id="playerListDiv"></div>
+    <div>
+        <label for="status">READY</label>
+        <input type="checkbox" name="status" id="status">
     </div>
-
 
     <script src="src/lobby.js"></script>
 </body>
