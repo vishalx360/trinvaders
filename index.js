@@ -1,68 +1,74 @@
+// IMPORTING LIBRARY
 const path = require("path");
 const express = require("express");
 const socket = require("socket.io");
+
+// initialization of EXPRESS-APP
 const app = express();
 
+// setting static to PUBLIC directory
 app.use(express.static("public"));
+
+// ROUTING
 app.get("/", function(req, res) {
   res.sendFile(__dirname + "/public/index.html");
+});
+app.get("/lobby", function(req, res) {
+  res.sendFile(__dirname + "/public/lobby.html");
 });
 app.get("/game", function(req, res) {
   res.sendFile(__dirname + "/public/game.html");
 });
 
+// initialization of SERVER
 const server = app.listen(8081, function() {
   console.log("Hosted at http://localhost:8081");
 });
 
-// socket
+// initialization of SOCKET
 const io = socket(server);
-// counter
-var connectedCounter = 0;
 
 const gameState = {
-  players: {}
+  lobbyState: {
+    players: {}
+  },
+  playState: {
+    players: {}
+  }
 };
+// Direct Variable for ease
+var lobbyPlayerList = gameState.lobbyState.players;
+// server reserved variable : counter
+var counter = 0;
 
+// listining for CONNECTION
 io.on("connection", function(socket) {
-  // counter operation - Adding to counter
-  //
-  connectedCounter++;
-  // emitting player status
-  io.sockets.emit("newConnection", {
-    playerId: socket.id,
-    playerCounter: connectedCounter
-  });
-  // local console :DEBUG
-  console.log(
-    `Players-Count: ${connectedCounter}, Player:${socket.id} Connected, `
-  );
-
-  //start
+  counter++;
+  //lobby adding
   socket.on("newPlayer", function(data) {
-    gameState.players[socket.id] = {
-      xPosition: data.xPosition,
-      yPosition: data.yPosition
-    };
-    console.log(gameState.players);
+    lobbyPlayerList[socket.id] = { username: data.username };
+    console.log(lobbyPlayerList);
+    io.sockets.emit("lobbyStateUpdate", gameState.lobbyState);
   });
+
+  // DEBUG LOG
+  io.sockets.emit("newConnection", { playerId: socket.id });
+  // local console :DEBUG
+  console.log(`Connected:${socket.id}. Counter:${counter}`);
 
   // disconnection
   socket.on("disconnect", function() {
-    delete gameState.players[socket.id];
-    // counter operation
-    connectedCounter--;
-    // emitting player status
-    io.sockets.emit("disconnect", {
-      playerId: socket.id,
-      playerCounter: connectedCounter
-    });
+    counter--;
+
+    delete lobbyPlayerList[socket.id];
+    io.sockets.emit("lobbyStateUpdate", gameState.lobbyState);
+
+    // DEBUG LOG
+    io.sockets.emit("disconnect", { playerId: socket.id });
     // local console :DEBUG
-    console.log(
-      `Players-Count: ${connectedCounter}, Player:${socket.id} Disconnected,`
-    );
+    console.log(`Disconnected:${socket.id}. Counter:${counter}`);
   });
 });
-setInterval(() => {
-  io.sockets.emit("state", gameState);
-}, 1000 / 60);
+// setInterval(() => {
+//   io.sockets.emit("lobbyStateUpdate", gameState.lobbyState);
+// }, 1000 / 0.2);

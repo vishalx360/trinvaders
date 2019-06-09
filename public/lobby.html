@@ -8,6 +8,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>TRI-INVADERS</title>
     <link rel="shortcut icon" href="favicon.png" type="image/x-icon">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.dev.js"></script>
 
 </head>
 
@@ -19,7 +20,7 @@
     }
 
     html {
-        background-color: black;
+        background-color: rgb(26, 26, 26);
         color: white;
     }
 
@@ -27,9 +28,7 @@
         font-family: 'Courier New', Courier, monospace;
     }
 
-    #container {
-        height: 100vh
-    }
+
 
     #title {
         display: flex;
@@ -40,13 +39,6 @@
 
 
 
-    #btnDiv {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        flex-direction: column;
-
-    }
 
     .btn {
         font-family: monospace;
@@ -67,6 +59,36 @@
     .btn:active {
         transform: scale(0.9)
     }
+
+    #log {
+        font-family: monospace;
+        position: fixed;
+        bottom: 30px;
+        left: 10px;
+        color: rgba(255, 255, 255, 0.719);
+        background: rgba(255, 255, 255, 0.103);
+    }
+
+    #playerCounter {
+        font-family: monospace;
+        font-size: 1.5em;
+        color: rgb(49, 49, 255)
+    }
+
+    #playerListDiv {
+        margin: 10px 30px;
+    }
+
+    #inputFeild {
+        padding: 10px;
+        box-sizing: border-box;
+        background: #f7f7f7;
+        border-radius: 25px;
+        border: none;
+        font-size: 1rem;
+        margin: 10px;
+        caret-color: rgb(0, 182, 70);
+    }
 </style>
 
 <body>
@@ -74,13 +96,27 @@
         <div id="title">
             <h1>TRINVADERS</h1>
             <p>the game only legends play</p>
+            <h2>LOBBY</h2>
         </div>
-        <div id="btnDiv">
-            <a href="/game"><button class="btn">PLAY</button></a>
-            <a href="#"><button class="btn">HOW TO PLAY</button></a>
 
-        </div>
     </div>
+    <!-- fixed logger -->
+    <ul id="log"></ul>
+
+    <div>
+        <p>Connected Players:<span id="playerCounter">0</span></p>
+    </div>
+    <div id="playerListDiv">
+        <ul>
+            <li>
+                <h2>Vishal</h2>
+                <h3>yurgguht6</h3>
+            </li>
+        </ul>
+    </div>
+
+
+    <script src="src/lobby.js"></script>
 </body>
 
 </html>
