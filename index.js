@@ -50,14 +50,26 @@ io.on("connection", function(socket) {
     console.log(lobbyPlayerList);
     io.sockets.emit("lobbyStateUpdate", gameState.lobbyState);
   });
-
+  // status listener
   socket.on("status", function(ready) {
     if (ready) {
-      console.log(socket.id + "is ready");
+      console.log(socket.id + " is ready");
       lobbyPlayerList[socket.id].status = true;
+      checkAllReady();
     } else {
-      console.log(socket.id + "is not ready");
+      console.log(socket.id + " is not ready");
       lobbyPlayerList[socket.id].status = false;
+    }
+
+    function checkAllReady() {
+      var list = Object.keys(lobbyPlayerList);
+      if (list.length >= 2) {
+        list.forEach(function(player) {
+          if (lobbyPlayerList[player].status) {
+            io.sockets.emit("start", "starting...");
+          }
+        });
+      }
     }
   });
 
@@ -72,7 +84,6 @@ io.on("connection", function(socket) {
 
     delete lobbyPlayerList[socket.id];
     io.sockets.emit("lobbyStateUpdate", gameState.lobbyState);
-
     // DEBUG LOG
     io.sockets.emit("disconnect", { playerId: socket.id });
     // local console :DEBUG

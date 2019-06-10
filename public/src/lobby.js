@@ -44,16 +44,20 @@ function updateLobbyUi(state) {
 
   function addPlayer(player, username, status) {
     //template
-    var newStatus;
+    var newStatus = "";
+    var playerRelation = "";
     if (status) {
       newStatus = "ready";
-    } else {
+    }
+    if (player == ClientSocket.id) {
+      playerRelation = " (YOU) ";
     }
     var playerNode =
       "<li><h2 class='" +
       newStatus +
       "'>" +
       username +
+      playerRelation +
       "</h2><h3>" +
       player +
       "</h3></li>";
@@ -74,27 +78,30 @@ function updateLobbyUi(state) {
 
   var playerList = "<ul>" + items + "</ul>";
 
+  UIcounter.textContent = lobbyPlayers.length;
+
   UIplayerListDiv.innerHTML = playerList;
 }
 
 ClientSocket.on("lobbyStateUpdate", function(state) {
   gameState.lobbyState = state;
   updateLobbyUi(state);
-
-  console.log(state);
 });
 
+ClientSocket.on("start", function(data) {
+  console.log(data);
+});
+
+// DEBUG
 ClientSocket.on("newConnection", function(data) {
   var newConnectLog = document.createElement("li");
   newConnectLog.textContent = "Connected: " + data.playerId;
   newConnectLog.style.color = "green";
   UIlog.appendChild(newConnectLog);
-  UIcounter.textContent = data.playerCounter;
 });
 ClientSocket.on("disconnect", function(data) {
   var newDisconnectLog = document.createElement("li");
   newDisconnectLog.textContent = "Disconnected: " + data.playerId;
   newDisconnectLog.style.color = "red";
   UIlog.appendChild(newDisconnectLog);
-  UIcounter.textContent = data.playerCounter;
 });

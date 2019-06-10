@@ -111,10 +111,12 @@
         <p>Connected Players:<span id="playerCounter">0</span></p>
     </div>
     <div id="playerListDiv"></div>
-    <div>
-        <label for="status">READY</label>
-        <input type="checkbox" name="status" id="status">
-    </div>
+
+
+    <label id="readyBtn" class="btn" for="status">
+        <input id="status" type="checkbox" value="1"><span>READY</span>
+    </label>
+
 
     <script src="src/lobby.js"></script>
 </body>
