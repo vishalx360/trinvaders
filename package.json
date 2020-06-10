@@ -1,0 +1,21 @@
+{
+  "name": "trinvaders",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "canvas": "^2.6.1",
+    "express": "^4.17.1",
+    "jsdom": "^16.2.2",
+    "socket.io": "^2.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.4"
+  },
+  "scripts": {
+    "start": "nodemon server/index.js",
+    "dev": "nodemon  --inspect server/index.js"
+  },
+  "author": "",
+  "license": "ISC"
+}
