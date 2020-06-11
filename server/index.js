@@ -1,45 +1,24 @@
 // imports
 const express = require("express");
-
+const fs = require("fs");
 // server game instance
 const path = require('path');
-const jsdom = require('jsdom')
-    // init
+const jsdom = require('jsdom');
+// init
 const app = express();
 const http = require("http").createServer(app)
 const io = require("socket.io")(http);
 
+const DatauriParser = require('datauri/parser');
+const parser = new DatauriParser();
+
 const { JSDOM } = jsdom;
-
-
-app.use(express.static('public'))
-
+// middleware
+app.use(express.static(__dirname + '/public'));
+// routes
 app.get("/", (req, res) => {
-    res.sendFile("/public/index.html");
+    res.sendFile(__dirname + '/index.html');
 })
-
-const players = {}
-
-
-
-
-
-io.on("connection", (socket) => {
-    console.log("Socket connection: ", socket.id)
-
-    players[socket.id] = {
-        x: Math.floor(Math.random(100, 200)) + 1,
-        y: Math.random(100, 200)
-    }
-    io.sockets.emit("new_player", players[socket.id])
-
-    socket.on("disconnect", () => {
-
-        console.log(socket.id, "disconnected")
-    })
-})
-
-
 
 
 function setupAuthoritativePhaser() {
@@ -51,14 +30,21 @@ function setupAuthoritativePhaser() {
         // So requestAnimatinFrame events fire
         pretendToBeVisual: true
     }).then((dom) => {
-
+        dom.window.URL.createObjectURL = (blob) => {
+            if (blob) {
+                return parser.format(blob.type, blob[Object.getOwnPropertySymbols(blob)[0]]._buffer).content;
+            }
+        };
+        dom.window.URL.revokeObjectURL = (objectURL) => {};
         dom.window.gameLoaded = () => {
             http.listen(8001, () => {
-                console.log("Game Server started on http://localhost:8001")
+                console.log("############## Game Server started on http://localhost:8001")
             });
         }
-
-    }).catch((error) => { console.log(error.message) })
+        dom.window.io = io;
+    }).catch((error) => {
+        console.log(error.message)
+    })
 }
 
 setupAuthoritativePhaser();
