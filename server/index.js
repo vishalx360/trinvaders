@@ -20,6 +20,7 @@ app.get("/", (req, res) => {
     res.sendFile(__dirname + '/index.html');
 })
 
+const PORT = process.env.PORT || 3000;
 
 function setupAuthoritativePhaser() {
     JSDOM.fromFile(path.join(__dirname, 'authoritative_server/index.html'), {
@@ -37,8 +38,8 @@ function setupAuthoritativePhaser() {
         };
         dom.window.URL.revokeObjectURL = (objectURL) => {};
         dom.window.gameLoaded = () => {
-            http.listen(8001, () => {
-                console.log("############## Game Server started on http://localhost:8001")
+            http.listen(PORT, () => {
+                console.log(`############## Game Server started on http://localhost:${PORT}`)
             });
         }
         dom.window.io = io;
