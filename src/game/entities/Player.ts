@@ -15,6 +15,7 @@ export class Player extends Physics.Arcade.Sprite {
     rotationSpeed: number = 200;
     maxSpeed: number = 400;
     drag: number = 50;
+    brakeDrag: number = 200; // Higher drag when braking/not thrusting
 
     // Thrust visual
     private thrustEmitter?: GameObjects.Particles.ParticleEmitter;
@@ -57,11 +58,35 @@ export class Player extends Physics.Arcade.Sprite {
         const thrustY = Math.sin(directionAngle) * this.thrustPower;
 
         body.setAcceleration(thrustX, thrustY);
+        // Normal drag while thrusting
+        body.setDrag(this.drag);
     }
 
     stopThrust() {
         const body = this.body as Physics.Arcade.Body;
         body.setAcceleration(0, 0);
+        // Apply higher drag when not thrusting for quicker slowdown
+        body.setDrag(this.brakeDrag);
+    }
+
+    // Reverse thrust / brake - thrust in opposite direction of movement
+    brake(delta: number) {
+        const body = this.body as Physics.Arcade.Body;
+
+        // Apply thrust in the opposite direction of current movement
+        const speed = Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2);
+        if (speed > 10) {
+            // Brake by thrusting against velocity direction
+            const brakeX = (-body.velocity.x / speed) * this.thrustPower * 0.8;
+            const brakeY = (-body.velocity.y / speed) * this.thrustPower * 0.8;
+            body.setAcceleration(brakeX, brakeY);
+        } else {
+            // Nearly stopped, just stop
+            body.setVelocity(0, 0);
+            body.setAcceleration(0, 0);
+        }
+        // Normal drag while braking
+        body.setDrag(this.drag);
     }
 
     rotateLeft(delta: number) {

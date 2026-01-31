@@ -1,6 +1,7 @@
 import { GameObjects, Scene } from 'phaser';
 import { EventBus } from '../EventBus';
 import { SoundManager } from '../systems/SoundManager';
+import { BotDifficulty } from '../ai/BotConfig';
 
 export class MainMenu extends Scene {
     background: GameObjects.Image;
@@ -12,6 +13,12 @@ export class MainMenu extends Scene {
     ships: GameObjects.Image[] = [];
     stars: GameObjects.Image[] = [];
     private soundManager!: SoundManager;
+
+    // Difficulty selection
+    private selectedDifficulty: BotDifficulty = 'medium';
+    private difficultyLabel!: GameObjects.Text;
+    private difficultyButtons: GameObjects.Text[] = [];
+    private difficultyContainer!: GameObjects.Container;
 
     constructor() {
         super('MainMenu');
@@ -70,6 +77,9 @@ export class MainMenu extends Scene {
         // Display decorative ships
         this.createDecorativeShips();
 
+        // Difficulty selector
+        this.createDifficultySelector();
+
         // Play button
         this.playButton = this.add.text(width / 2, height / 2 + 100, '[ PLAY ]', {
             fontFamily: 'Arial Black',
@@ -103,7 +113,7 @@ export class MainMenu extends Scene {
         });
 
         // Instructions
-        this.controlsText = this.add.text(width / 2, height - 100, 'ARROW KEYS or WASD to move  •  SPACE to shoot', {
+        this.controlsText = this.add.text(width / 2, height - 100, 'W/↑ thrust  •  S/↓ brake  •  A/D or ←/→ rotate  •  SPACE shoot', {
             fontFamily: 'Arial',
             fontSize: '16px',
             color: '#888888'
@@ -187,15 +197,95 @@ export class MainMenu extends Scene {
         this.ships.push(leftShip, rightShip);
     }
 
+    createDifficultySelector() {
+        const { width, height } = this.scale;
+        const centerY = height / 2;
+
+        // Label
+        this.difficultyLabel = this.add.text(width / 2, centerY - 10, 'DIFFICULTY', {
+            fontFamily: 'Arial',
+            fontSize: '16px',
+            color: '#888888'
+        }).setOrigin(0.5);
+
+        // Difficulty options
+        const difficulties: { key: BotDifficulty; label: string; color: string }[] = [
+            { key: 'easy', label: 'EASY', color: '#44ff44' },
+            { key: 'medium', label: 'MEDIUM', color: '#ffff44' },
+            { key: 'hard', label: 'HARD', color: '#ff4444' }
+        ];
+
+        const buttonSpacing = 120;
+        const startX = width / 2 - buttonSpacing;
+
+        difficulties.forEach((diff, index) => {
+            const x = startX + index * buttonSpacing;
+            const button = this.add.text(x, centerY + 25, diff.label, {
+                fontFamily: 'Arial Black',
+                fontSize: '20px',
+                color: this.selectedDifficulty === diff.key ? diff.color : '#666666',
+                stroke: this.selectedDifficulty === diff.key ? diff.color : '#333333',
+                strokeThickness: this.selectedDifficulty === diff.key ? 2 : 1
+            }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+            // Store reference to color for updates
+            (button as any).diffKey = diff.key;
+            (button as any).activeColor = diff.color;
+
+            button.on('pointerover', () => {
+                if (this.selectedDifficulty !== diff.key) {
+                    button.setStyle({ color: '#aaaaaa' });
+                }
+            });
+
+            button.on('pointerout', () => {
+                if (this.selectedDifficulty !== diff.key) {
+                    button.setStyle({ color: '#666666' });
+                }
+            });
+
+            button.on('pointerdown', () => {
+                this.soundManager.playClick();
+                this.selectDifficulty(diff.key);
+            });
+
+            this.difficultyButtons.push(button);
+        });
+    }
+
+    selectDifficulty(difficulty: BotDifficulty) {
+        this.selectedDifficulty = difficulty;
+
+        // Update button styles
+        this.difficultyButtons.forEach((button) => {
+            const diffKey = (button as any).diffKey as BotDifficulty;
+            const activeColor = (button as any).activeColor as string;
+
+            if (diffKey === difficulty) {
+                button.setStyle({
+                    color: activeColor,
+                    stroke: activeColor,
+                    strokeThickness: 2
+                });
+            } else {
+                button.setStyle({
+                    color: '#666666',
+                    stroke: '#333333',
+                    strokeThickness: 1
+                });
+            }
+        });
+    }
+
     startGame() {
         // Play click sound
         this.soundManager.playClick();
 
-        // Fade out and start game
+        // Fade out and start game with selected difficulty
         this.cameras.main.fadeOut(500, 0, 0, 0);
         this.cameras.main.once('camerafadeoutcomplete', () => {
             this.soundManager.destroy();
-            this.scene.start('Game');
+            this.scene.start('Game', { difficulty: this.selectedDifficulty });
         });
     }
 
@@ -229,5 +319,15 @@ export class MainMenu extends Scene {
             this.ships[0].setPosition(200, height / 2 - 50);
             this.ships[1].setPosition(width - 200, height / 2 - 50);
         }
+
+        // Reposition difficulty selector
+        const centerY = height / 2;
+        if (this.difficultyLabel) this.difficultyLabel.setPosition(width / 2, centerY - 10);
+
+        const buttonSpacing = 120;
+        const startX = width / 2 - buttonSpacing;
+        this.difficultyButtons.forEach((button, index) => {
+            button.setPosition(startX + index * buttonSpacing, centerY + 25);
+        });
     }
 }

@@ -2,7 +2,10 @@ import { Scene, Physics, GameObjects, Input } from 'phaser';
 import { EventBus } from '../EventBus';
 import { Player } from '../entities/Player';
 import { Bullet } from '../entities/Bullet';
+import { Bot } from '../entities/Bot';
 import { SoundManager } from '../systems/SoundManager';
+import { BotManager } from '../systems/BotManager';
+import { BotDifficulty } from '../ai/BotConfig';
 
 // Ship colors for multiplayer
 const SHIP_COLORS = ['blue', 'red', 'green', 'yellow'];
@@ -16,6 +19,9 @@ export class Game extends Scene {
 
     // Sound
     private soundManager!: SoundManager;
+
+    // Bot system
+    private botManager!: BotManager;
 
     // Input
     private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -42,33 +48,53 @@ export class Game extends Scene {
     private ammoRegenRate: number = 500; // ms per ammo regeneration
     private lastAmmoRegen: number = 0;
 
+    // Health system
+    private maxHealth: number = 100;
+    private currentHealth: number = 100;
+    private healthRegenRate: number = 2000; // ms per health point regeneration
+    private lastHealthRegen: number = 0;
+    private healthRegenAmount: number = 5; // health points per regen tick
+
     // UI bars
     private speedBarBg!: GameObjects.Rectangle;
     private speedBarFill!: GameObjects.Rectangle;
     private ammoBarBg!: GameObjects.Rectangle;
     private ammoBarFill!: GameObjects.Rectangle;
+    private healthBarBg!: GameObjects.Rectangle;
+    private healthBarFill!: GameObjects.Rectangle;
+    private healthLabel!: GameObjects.Text;
 
     // For multiplayer (prepared for Socket.io integration)
     private playerId: string = 'local_' + Math.random().toString(36).substr(2, 9);
     private shipColor: string = SHIP_COLORS[Math.floor(Math.random() * SHIP_COLORS.length)];
+
+    // Game difficulty (set from menu)
+    private gameDifficulty: BotDifficulty = 'medium';
 
     // UI Labels (need references for repositioning)
     private speedLabel!: GameObjects.Text;
     private ammoLabel!: GameObjects.Text;
     private shipColorText!: GameObjects.Text;
     private fireButtonText?: GameObjects.Text;
+    private quitButton!: GameObjects.Text;
+    private escKey!: Phaser.Input.Keyboard.Key;
 
     constructor() {
         super('Game');
     }
 
-    create() {
+    create(data: { difficulty?: BotDifficulty }) {
         const { width, height } = this.scale;
+
+        // Get difficulty from menu (default to medium)
+        this.gameDifficulty = data?.difficulty || 'medium';
 
         // Reset state
         this.score = 0;
         this.currentAmmo = this.maxAmmo;
         this.lastAmmoRegen = 0;
+        this.currentHealth = this.maxHealth;
+        this.lastHealthRegen = 0;
 
         // Initialize sound
         this.soundManager = new SoundManager(this);
@@ -106,6 +132,9 @@ export class Game extends Scene {
 
         // UI
         this.createUI();
+
+        // Initialize bot system
+        this.initializeBotManager();
 
         EventBus.emit('current-scene-ready', this);
     }
@@ -145,6 +174,10 @@ export class Game extends Scene {
             playerId: this.playerId,
             isLocal: true
         });
+
+        // Make player visually distinct with a cyan glow effect
+        this.player.setTint(0xffffff); // Bright white base
+        this.player.postFX?.addGlow(0x00ffff, 4, 0, false, 0.1, 16); // Cyan glow outline
     }
 
     setupInput() {
@@ -161,6 +194,12 @@ export class Game extends Scene {
 
         // Fire key
         this.fireKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.SPACE);
+
+        // ESC key to quit
+        this.escKey = this.input.keyboard!.addKey(Input.Keyboard.KeyCodes.ESC);
+        this.escKey.on('down', () => {
+            this.quitToMenu();
+        });
     }
 
     detectMobile() {
@@ -316,6 +355,197 @@ export class Game extends Scene {
             .setOrigin(0, 0)
             .setDepth(101)
             .setScrollFactor(0);
+
+        // Health bar (top right)
+        const { width } = this.scale;
+        const healthBarWidth = 150;
+        const healthBarHeight = 16;
+        const healthBarX = width - healthBarWidth - 20;
+        const healthBarY = 20;
+
+        this.healthLabel = this.add.text(healthBarX, healthBarY - 18, 'HEALTH', {
+            fontFamily: 'Arial',
+            fontSize: '12px',
+            color: '#ff4444'
+        }).setDepth(100).setScrollFactor(0);
+
+        this.healthBarBg = this.add.rectangle(healthBarX, healthBarY, healthBarWidth, healthBarHeight, 0x333333)
+            .setOrigin(0, 0)
+            .setStrokeStyle(2, 0xff4444)
+            .setDepth(100)
+            .setScrollFactor(0);
+
+        this.healthBarFill = this.add.rectangle(healthBarX + 2, healthBarY + 2, healthBarWidth - 4, healthBarHeight - 4, 0xff4444)
+            .setOrigin(0, 0)
+            .setDepth(101)
+            .setScrollFactor(0);
+
+        // Quit button (top right corner, below health bar)
+        this.quitButton = this.add.text(width - 20, 60, '[ESC] QUIT', {
+            fontFamily: 'Arial',
+            fontSize: '14px',
+            color: '#666666'
+        }).setOrigin(1, 0).setDepth(100).setScrollFactor(0).setInteractive({ useHandCursor: true });
+
+        this.quitButton.on('pointerover', () => {
+            this.quitButton.setStyle({ color: '#ff4444' });
+        });
+
+        this.quitButton.on('pointerout', () => {
+            this.quitButton.setStyle({ color: '#666666' });
+        });
+
+        this.quitButton.on('pointerdown', () => {
+            this.quitToMenu();
+        });
+    }
+
+    initializeBotManager() {
+        // Create bot manager
+        this.botManager = new BotManager(this, this.player, this.bullets);
+
+        // Set up bot fire callback (play sound and tint bullet red)
+        this.botManager.setOnBotFire((bot, bullet) => {
+            this.soundManager.playShoot();
+            bullet.setTint(0xff4444); // Red tint for bot bullets
+        });
+
+        // Set up collisions
+        this.setupBotCollisions();
+
+        // Spawn initial bots (one of each difficulty)
+        this.spawnInitialBots();
+    }
+
+    setupBotCollisions() {
+        // Player bullets hitting bots
+        this.physics.add.overlap(
+            this.bullets,
+            this.botManager.getBotGroup(),
+            (bulletObj, botObj) => {
+                const bullet = bulletObj as Bullet;
+                const bot = botObj as Bot;
+
+                // Only player bullets damage bots
+                if (bullet.ownerId === this.playerId && bullet.active && bot.active) {
+                    this.bulletHitBot(bullet, bot);
+                }
+            },
+            undefined,
+            this
+        );
+    }
+
+    bulletHitBot(bullet: Bullet, bot: Bot) {
+        // Destroy bullet
+        bullet.destroy();
+
+        // Deal damage to bot
+        const damage = 20;
+        const destroyed = bot.takeDamage(damage);
+
+        // Play hit sound
+        this.soundManager.playHit();
+
+        if (destroyed) {
+            // Remove bot from manager
+            this.botManager.removeBotByReference(bot);
+
+            // Play explosion sound
+            this.soundManager.playExplosion();
+
+            // Add score based on difficulty
+            let points = 100;
+            switch (bot.difficulty) {
+                case 'easy': points = 50; break;
+                case 'medium': points = 100; break;
+                case 'hard': points = 200; break;
+            }
+            this.addScore(points);
+
+            // Destroy bot
+            bot.destroy();
+
+            // Respawn a new bot after delay (same difficulty as game setting)
+            this.time.delayedCall(2000, () => {
+                if (this.player && this.player.active) {
+                    this.botManager.spawnBotRandom(this.gameDifficulty, 250);
+                    // Re-setup collisions for new bots
+                    this.refreshBotCollisions();
+                }
+            });
+        }
+    }
+
+    bulletHitPlayer(bullet: Bullet) {
+        // Destroy bullet
+        bullet.destroy();
+
+        // Calculate damage based on bot difficulty (if we can determine it)
+        const damage = 20; // Base damage per hit
+
+        // Reduce health
+        this.currentHealth -= damage;
+
+        // Play hit sound
+        this.soundManager.playHit();
+
+        // Flash player red to indicate damage
+        this.player.setTint(0xff0000);
+        this.time.delayedCall(100, () => {
+            if (this.player && this.player.active) {
+                this.player.setTint(0xffffff); // Restore white tint (glow is separate)
+            }
+        });
+
+        // Check for death
+        if (this.currentHealth <= 0) {
+            this.currentHealth = 0;
+            this.soundManager.playDeath();
+            this.gameOver();
+        }
+    }
+
+    checkBotBulletsHitPlayer() {
+        if (!this.player || !this.player.active) return;
+
+        const playerBody = this.player.body as Physics.Arcade.Body;
+        const playerRadius = 20; // Approximate collision radius
+
+        this.bullets.getChildren().forEach((obj) => {
+            const bullet = obj as Bullet;
+            if (!bullet.active) return;
+
+            // Check if this is a bot bullet
+            if (!this.botManager.isBotBullet(bullet)) return;
+
+            // Simple distance check for collision
+            const dx = bullet.x - this.player.x;
+            const dy = bullet.y - this.player.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < playerRadius + 10) {
+                this.bulletHitPlayer(bullet);
+            }
+        });
+    }
+
+    refreshBotCollisions() {
+        // No longer needed - physics group handles new bots automatically
+    }
+
+    spawnInitialBots() {
+        // Number of bots based on difficulty
+        let botCount = 2;
+        switch (this.gameDifficulty) {
+            case 'easy': botCount = 1; break;
+            case 'medium': botCount = 2; break;
+            case 'hard': botCount = 3; break;
+        }
+
+        for (let i = 0; i < botCount; i++) {
+            this.botManager.spawnBotRandom(this.gameDifficulty, 250);
+        }
     }
 
     update(time: number, delta: number) {
@@ -334,11 +564,22 @@ export class Game extends Scene {
             }
         });
 
+        // Update bots
+        if (this.botManager) {
+            this.botManager.update(time, delta);
+
+            // Check for bot bullets hitting player
+            this.checkBotBulletsHitPlayer();
+        }
+
         // Update speed bar
         this.updateSpeedBar();
 
         // Regenerate ammo over time
         this.updateAmmo(time);
+
+        // Regenerate health over time
+        this.updateHealth(time);
     }
 
     updateSpeedBar() {
@@ -385,9 +626,36 @@ export class Game extends Scene {
         }
     }
 
+    updateHealth(time: number) {
+        // Regenerate health over time (slowly)
+        if (this.currentHealth < this.maxHealth) {
+            if (time - this.lastHealthRegen > this.healthRegenRate) {
+                this.currentHealth = Math.min(this.currentHealth + this.healthRegenAmount, this.maxHealth);
+                this.lastHealthRegen = time;
+            }
+        }
+
+        // Update health bar fill
+        const healthPercent = this.currentHealth / this.maxHealth;
+        const maxFillWidth = 146; // 150 - 4 padding
+        this.healthBarFill.width = maxFillWidth * healthPercent;
+
+        // Change color based on health level
+        if (healthPercent <= 0.25) {
+            this.healthBarFill.setFillStyle(0xff0000); // Bright red when critical
+        } else if (healthPercent <= 0.5) {
+            this.healthBarFill.setFillStyle(0xff4444); // Red when low
+        } else if (healthPercent <= 0.75) {
+            this.healthBarFill.setFillStyle(0xffff00); // Yellow when medium
+        } else {
+            this.healthBarFill.setFillStyle(0x44ff44); // Green when good
+        }
+    }
+
     handleInput(time: number, delta: number) {
         let rotating = false;
         let thrusting = false;
+        let braking = false;
         let firing = false;
 
         // Keyboard: Rotation
@@ -403,6 +671,12 @@ export class Game extends Scene {
         if (this.cursors.up.isDown || this.wasd.W.isDown) {
             this.player.thrust(delta);
             thrusting = true;
+        }
+
+        // Keyboard: Brake / Reverse
+        if (this.cursors.down.isDown || this.wasd.S.isDown) {
+            this.player.brake(delta);
+            braking = true;
         }
 
         // Keyboard: Fire
@@ -465,7 +739,7 @@ export class Game extends Scene {
         if (!rotating) {
             this.player.stopRotation();
         }
-        if (!thrusting) {
+        if (!thrusting && !braking) {
             this.player.stopThrust();
         }
 
@@ -492,6 +766,9 @@ export class Game extends Scene {
 
         this.bullets.add(bullet);
         bullet.launch(); // Set velocity after adding to group
+
+        // Tint player bullets cyan
+        bullet.setTint(0x00ffff);
 
         // Play shoot sound
         this.soundManager.playShoot();
@@ -557,15 +834,38 @@ export class Game extends Scene {
         // Play game over sound
         this.soundManager.playGameOver();
 
+        // Clean up bot manager
+        if (this.botManager) {
+            this.botManager.clearAllBots();
+        }
+
         // Clean up sound manager
         this.time.delayedCall(1000, () => {
             this.soundManager.destroy();
+            if (this.botManager) {
+                this.botManager.destroy();
+            }
             this.scene.start('GameOver', { score: this.score });
         });
     }
 
     changeScene() {
         this.gameOver();
+    }
+
+    quitToMenu() {
+        // Clean up
+        if (this.botManager) {
+            this.botManager.clearAllBots();
+            this.botManager.destroy();
+        }
+        this.soundManager.destroy();
+
+        // Fade out and return to menu
+        this.cameras.main.fadeOut(300, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+            this.scene.start('MainMenu');
+        });
     }
 
     handleResize(gameSize: Phaser.Structs.Size) {
@@ -585,6 +885,17 @@ export class Game extends Scene {
         if (this.ammoBarBg) this.ammoBarBg.setPosition(barX, ammoBarY);
         if (this.ammoBarFill) this.ammoBarFill.setPosition(barX + 2, ammoBarY + 2);
 
+        // Reposition health bar (top right)
+        const healthBarWidth = 150;
+        const healthBarX = width - healthBarWidth - 20;
+        const healthBarY = 20;
+        if (this.healthLabel) this.healthLabel.setPosition(healthBarX, healthBarY - 18);
+        if (this.healthBarBg) this.healthBarBg.setPosition(healthBarX, healthBarY);
+        if (this.healthBarFill) this.healthBarFill.setPosition(healthBarX + 2, healthBarY + 2);
+
+        // Reposition quit button
+        if (this.quitButton) this.quitButton.setPosition(width - 20, 60);
+
         // Reposition mobile controls if present
         if (this.isMobile) {
             const joystickX = 120;
@@ -596,6 +907,11 @@ export class Game extends Scene {
             if (this.joystickThumb) this.joystickThumb.setPosition(joystickX, joystickY);
             if (this.fireButton) this.fireButton.setPosition(fireX, fireY);
             if (this.fireButtonText) this.fireButtonText.setPosition(fireX, fireY);
+        }
+
+        // Update bot manager screen size
+        if (this.botManager) {
+            this.botManager.updateScreenSize(width, height);
         }
     }
 }
