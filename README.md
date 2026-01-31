@@ -2,7 +2,7 @@
 
 An Asteroids-style space shooter game built with Phaser 3 and Next.js. Features AI-controlled bots with configurable difficulty levels, mobile touch controls, and real-time multiplayer support via Socket.io.
 
-![TRINVADERS Screenshot](screenshot.png)
+![TRINVADERS](archived/poster.png)
 
 ## Project History
 
