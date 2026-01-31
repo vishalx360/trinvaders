@@ -2,6 +2,12 @@
 
 An Asteroids-style space shooter game built with Phaser 3 and Next.js. Features AI-controlled bots with configurable difficulty levels, mobile touch controls, and real-time multiplayer support via Socket.io.
 
+![TRINVADERS Screenshot](screenshot.png)
+
+## Project History
+
+This project started as a side project in **2019** - about 6 years ago. After sitting incomplete for years, it was finally finished in **2025** with the help of [Claude Code](https://claude.ai/code). The original archived code can be found in the `archived/` folder.
+
 ## Features
 
 - **Single Player Mode**: Battle against AI bots with easy, medium, and hard difficulty levels
@@ -108,7 +114,7 @@ trinvaders/
 │   └── gameServer.js      # Socket.io multiplayer server
 ├── public/
 │   └── assets/            # Game sprites and images
-└── archived/              # Legacy code reference
+└── archived/              # Original 2019 code (legacy reference)
 ```
 
 ## Architecture
@@ -135,4 +141,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - Built with the [Phaser Next.js Template](https://github.com/phaserjs/template-nextjs)
+- Completed with the assistance of [Claude Code](https://claude.ai/code)
 - Ship sprites and game assets included in `public/assets/`
