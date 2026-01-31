@@ -22,16 +22,19 @@
         "typescript"
     ],
     "scripts": {
-        "dev": "node log.js dev & next dev -p 8080",
-        "build": "node log.js build & next build",
-        "dev-nolog": "next dev -p 8080",
-        "build-nolog": "next build"
+        "dev": "bun run log.js dev & bun next dev -p 8080",
+        "build": "bun run log.js build & bun next build",
+        "dev-nolog": "bun next dev -p 8080",
+        "build-nolog": "bun next build",
+        "server": "bun run server/gameServer.js",
+        "multiplayer": "bun run server/gameServer.js & bun next dev -p 8080"
     },
     "dependencies": {
         "next": "15.3.1",
         "phaser": "^3.90.0",
         "react": "19.0.0",
-        "react-dom": "19.0.0"
+        "react-dom": "19.0.0",
+        "socket.io-client": "^4.8.3"
     },
     "devDependencies": {
         "@types/node": "^20",

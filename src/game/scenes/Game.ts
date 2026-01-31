@@ -6,6 +6,8 @@ import { Bot } from '../entities/Bot';
 import { SoundManager } from '../systems/SoundManager';
 import { BotManager } from '../systems/BotManager';
 import { BotDifficulty } from '../ai/BotConfig';
+import { NetworkManager, NetworkState, FireData, HitData } from '../network/NetworkManager';
+import { Interpolation } from '../network/Interpolation';
 
 // Ship colors for multiplayer
 const SHIP_COLORS = ['blue', 'red', 'green', 'yellow'];
@@ -71,6 +73,18 @@ export class Game extends Scene {
     // Game difficulty (set from menu)
     private gameDifficulty: BotDifficulty = 'medium';
 
+    // Multiplayer state
+    private isMultiplayer: boolean = false;
+    private networkManager?: NetworkManager;
+    private remotePlayer?: Player;
+    private remoteInterpolation?: Interpolation;
+    private frameCount: number = 0;
+    private remoteHealth: number = 100;
+    private opponentHealthBarBg?: GameObjects.Rectangle;
+    private opponentHealthBarFill?: GameObjects.Rectangle;
+    private opponentHealthLabel?: GameObjects.Text;
+    private gameEnded: boolean = false;
+
     // UI Labels (need references for repositioning)
     private speedLabel!: GameObjects.Text;
     private ammoLabel!: GameObjects.Text;
@@ -83,11 +97,17 @@ export class Game extends Scene {
         super('Game');
     }
 
-    create(data: { difficulty?: BotDifficulty }) {
+    create(data: { difficulty?: BotDifficulty; isMultiplayer?: boolean; networkManager?: NetworkManager }) {
         const { width, height } = this.scale;
 
         // Get difficulty from menu (default to medium)
         this.gameDifficulty = data?.difficulty || 'medium';
+
+        // Multiplayer setup
+        this.isMultiplayer = data?.isMultiplayer || false;
+        this.networkManager = data?.networkManager;
+        this.gameEnded = false;
+        this.frameCount = 0;
 
         // Reset state
         this.score = 0;
@@ -133,8 +153,12 @@ export class Game extends Scene {
         // UI
         this.createUI();
 
-        // Initialize bot system
-        this.initializeBotManager();
+        // Initialize bot system OR multiplayer
+        if (this.isMultiplayer) {
+            this.initializeMultiplayer();
+        } else {
+            this.initializeBotManager();
+        }
 
         EventBus.emit('current-scene-ready', this);
     }
@@ -400,6 +424,268 @@ export class Game extends Scene {
         });
     }
 
+    initializeMultiplayer() {
+        if (!this.networkManager) return;
+
+        const { width, height } = this.scale;
+
+        // Create interpolation for remote player
+        this.remoteInterpolation = new Interpolation(100);
+        this.remoteHealth = 100;
+
+        // Create remote player (on opposite side of screen)
+        this.remotePlayer = new Player(this, {
+            x: width / 2,
+            y: height / 4, // Start at top
+            texture: 'ship_red', // Opponent is always red
+            playerId: 'remote',
+            isLocal: false
+        });
+        this.remotePlayer.setTint(0xff6666); // Red tint for opponent
+        this.remotePlayer.postFX?.addGlow(0xff4444, 4, 0, false, 0.1, 16);
+
+        // Create opponent health bar UI
+        this.createOpponentHealthBar();
+
+        // Setup network event handlers
+        this.setupNetworkHandlers();
+    }
+
+    createOpponentHealthBar() {
+        const { width } = this.scale;
+        const barWidth = 150;
+        const barHeight = 16;
+        const barX = width - barWidth - 20;
+        const barY = 85; // Below player health bar
+
+        this.opponentHealthLabel = this.add.text(barX, barY - 18, 'OPPONENT', {
+            fontFamily: 'Arial',
+            fontSize: '12px',
+            color: '#ff8844'
+        }).setDepth(100).setScrollFactor(0);
+
+        this.opponentHealthBarBg = this.add.rectangle(barX, barY, barWidth, barHeight, 0x333333)
+            .setOrigin(0, 0)
+            .setStrokeStyle(2, 0xff8844)
+            .setDepth(100)
+            .setScrollFactor(0);
+
+        this.opponentHealthBarFill = this.add.rectangle(barX + 2, barY + 2, barWidth - 4, barHeight - 4, 0xff8844)
+            .setOrigin(0, 0)
+            .setDepth(101)
+            .setScrollFactor(0);
+    }
+
+    setupNetworkHandlers() {
+        if (!this.networkManager) return;
+
+        // Handle remote player position updates
+        this.networkManager.on('remote-position', (data: NetworkState, timestamp: number) => {
+            if (this.remoteInterpolation) {
+                this.remoteInterpolation.addState(data, timestamp);
+            }
+        });
+
+        // Handle remote player firing
+        this.networkManager.on('remote-fire', (data: FireData) => {
+            this.spawnRemoteBullet(data);
+        });
+
+        // Handle being hit by remote player
+        this.networkManager.on('remote-hit', (data: HitData) => {
+            // We got hit - apply damage
+            this.currentHealth = data.newHealth;
+            this.soundManager.playHit();
+
+            // Flash player red
+            this.player.setTint(0xff0000);
+            this.time.delayedCall(100, () => {
+                if (this.player && this.player.active) {
+                    this.player.setTint(0xffffff);
+                }
+            });
+
+            if (this.currentHealth <= 0) {
+                this.currentHealth = 0;
+                this.handleMultiplayerDeath(false); // We lost
+            }
+        });
+
+        // Handle remote player death (we won!)
+        this.networkManager.on('remote-death', () => {
+            this.handleMultiplayerDeath(true); // We won
+        });
+
+        // Handle peer disconnection
+        this.networkManager.on('peer-left', () => {
+            if (!this.gameEnded) {
+                this.handleOpponentDisconnect();
+            }
+        });
+
+        this.networkManager.on('disconnected', () => {
+            if (!this.gameEnded) {
+                this.handleOpponentDisconnect();
+            }
+        });
+    }
+
+    spawnRemoteBullet(data: FireData) {
+        const bullet = new Bullet(this, {
+            x: data.x,
+            y: data.y,
+            angle: data.angle,
+            ownerId: 'remote',
+            texture: 'bullet_basic'
+        });
+
+        this.bullets.add(bullet);
+        bullet.launch();
+        bullet.setTint(0xff4444); // Red tint for enemy bullets
+
+        this.soundManager.playShoot();
+    }
+
+    handleMultiplayerDeath(won: boolean) {
+        if (this.gameEnded) return;
+        this.gameEnded = true;
+
+        if (won) {
+            this.soundManager.playExplosion();
+            this.addScore(500); // Bonus for winning
+        } else {
+            this.soundManager.playDeath();
+        }
+
+        // Clean up
+        this.time.delayedCall(1500, () => {
+            if (this.networkManager) {
+                this.networkManager.disconnect();
+            }
+            this.soundManager.destroy();
+            this.scene.start('GameOver', {
+                score: this.score,
+                isMultiplayer: true,
+                won: won
+            });
+        });
+    }
+
+    handleOpponentDisconnect() {
+        if (this.gameEnded) return;
+        this.gameEnded = true;
+
+        // Show disconnect message
+        const { width, height } = this.scale;
+        this.add.text(width / 2, height / 2, 'OPPONENT DISCONNECTED', {
+            fontFamily: 'Arial Black',
+            fontSize: '32px',
+            color: '#ff8844'
+        }).setOrigin(0.5).setDepth(200);
+
+        this.time.delayedCall(2000, () => {
+            if (this.networkManager) {
+                this.networkManager.disconnect();
+            }
+            this.soundManager.destroy();
+            this.scene.start('MainMenu');
+        });
+    }
+
+    checkMultiplayerCollisions() {
+        if (!this.remotePlayer || !this.remotePlayer.active) return;
+
+        const playerRadius = 20;
+
+        // Check if our bullets hit remote player
+        this.bullets.getChildren().forEach((obj) => {
+            const bullet = obj as Bullet;
+            if (!bullet.active || bullet.ownerId !== this.playerId) return;
+
+            const dx = bullet.x - this.remotePlayer!.x;
+            const dy = bullet.y - this.remotePlayer!.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < playerRadius + 10) {
+                bullet.destroy();
+                this.remoteHealth -= 20;
+                this.soundManager.playHit();
+
+                // Flash remote player
+                this.remotePlayer!.setTint(0xffffff);
+                this.time.delayedCall(100, () => {
+                    if (this.remotePlayer && this.remotePlayer.active) {
+                        this.remotePlayer.setTint(0xff6666);
+                    }
+                });
+
+                // Notify opponent they got hit
+                this.networkManager?.sendHit({
+                    damage: 20,
+                    newHealth: Math.max(0, 100 - (100 - this.remoteHealth)),
+                    shooterId: this.playerId
+                });
+
+                // Update opponent health bar
+                this.updateOpponentHealthBar();
+
+                if (this.remoteHealth <= 0) {
+                    this.networkManager?.sendDeath({ killerId: this.playerId });
+                    this.handleMultiplayerDeath(true);
+                }
+            }
+        });
+
+        // Check if remote bullets hit us
+        this.bullets.getChildren().forEach((obj) => {
+            const bullet = obj as Bullet;
+            if (!bullet.active || bullet.ownerId !== 'remote') return;
+
+            const dx = bullet.x - this.player.x;
+            const dy = bullet.y - this.player.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < playerRadius + 10) {
+                bullet.destroy();
+                this.currentHealth -= 20;
+                this.soundManager.playHit();
+
+                // Flash player
+                this.player.setTint(0xff0000);
+                this.time.delayedCall(100, () => {
+                    if (this.player && this.player.active) {
+                        this.player.setTint(0xffffff);
+                    }
+                });
+
+                if (this.currentHealth <= 0) {
+                    this.currentHealth = 0;
+                    this.networkManager?.sendDeath({ killerId: 'remote' });
+                    this.handleMultiplayerDeath(false);
+                }
+            }
+        });
+    }
+
+    updateOpponentHealthBar() {
+        if (!this.opponentHealthBarFill) return;
+
+        const healthPercent = Math.max(0, this.remoteHealth) / 100;
+        const maxFillWidth = 146;
+        this.opponentHealthBarFill.width = maxFillWidth * healthPercent;
+
+        // Change color based on health
+        if (healthPercent <= 0.25) {
+            this.opponentHealthBarFill.setFillStyle(0xff0000);
+        } else if (healthPercent <= 0.5) {
+            this.opponentHealthBarFill.setFillStyle(0xff4444);
+        } else if (healthPercent <= 0.75) {
+            this.opponentHealthBarFill.setFillStyle(0xffff00);
+        } else {
+            this.opponentHealthBarFill.setFillStyle(0xff8844);
+        }
+    }
+
     initializeBotManager() {
         // Create bot manager
         this.botManager = new BotManager(this, this.player, this.bullets);
@@ -550,6 +836,9 @@ export class Game extends Scene {
 
     update(time: number, delta: number) {
         if (!this.player || !this.player.active) return;
+        if (this.gameEnded) return;
+
+        this.frameCount++;
 
         // Handle input
         this.handleInput(time, delta);
@@ -564,8 +853,31 @@ export class Game extends Scene {
             }
         });
 
-        // Update bots
-        if (this.botManager) {
+        // Multiplayer updates
+        if (this.isMultiplayer && this.networkManager) {
+            // Broadcast position at 30Hz (every 2 frames at 60fps)
+            if (this.frameCount % 2 === 0) {
+                this.networkManager.sendPosition(this.player.getNetworkState());
+            }
+
+            // Update remote player interpolation
+            if (this.remotePlayer && this.remoteInterpolation) {
+                const interpolatedState = this.remoteInterpolation.getInterpolatedState(Date.now());
+                if (interpolatedState) {
+                    this.remotePlayer.x = interpolatedState.x;
+                    this.remotePlayer.y = interpolatedState.y;
+                    this.remotePlayer.angle = interpolatedState.rotation;
+                }
+                // Wrap remote player
+                this.remotePlayer.wrapBounds(this.scale.width, this.scale.height);
+            }
+
+            // Check collisions in multiplayer
+            this.checkMultiplayerCollisions();
+        }
+
+        // Update bots (only in single player)
+        if (!this.isMultiplayer && this.botManager) {
             this.botManager.update(time, delta);
 
             // Check for bot bullets hitting player
@@ -755,6 +1067,7 @@ export class Game extends Scene {
         this.currentAmmo--;
 
         const spawnPoint = this.player.getBulletSpawnPoint();
+        const bulletId = `${this.playerId}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
         const bullet = new Bullet(this, {
             x: spawnPoint.x,
@@ -772,6 +1085,16 @@ export class Game extends Scene {
 
         // Play shoot sound
         this.soundManager.playShoot();
+
+        // Broadcast fire event in multiplayer
+        if (this.isMultiplayer && this.networkManager) {
+            this.networkManager.sendFire({
+                x: spawnPoint.x,
+                y: spawnPoint.y,
+                angle: spawnPoint.angle,
+                bulletId: bulletId
+            });
+        }
     }
 
     // Multiplayer methods (ready for Socket.io integration)
@@ -859,6 +1182,12 @@ export class Game extends Scene {
             this.botManager.clearAllBots();
             this.botManager.destroy();
         }
+
+        // Clean up multiplayer
+        if (this.networkManager) {
+            this.networkManager.disconnect();
+        }
+
         this.soundManager.destroy();
 
         // Fade out and return to menu
@@ -894,7 +1223,16 @@ export class Game extends Scene {
         if (this.healthBarFill) this.healthBarFill.setPosition(healthBarX + 2, healthBarY + 2);
 
         // Reposition quit button
-        if (this.quitButton) this.quitButton.setPosition(width - 20, 60);
+        if (this.quitButton) this.quitButton.setPosition(width - 20, this.isMultiplayer ? 125 : 60);
+
+        // Reposition opponent health bar (multiplayer only)
+        if (this.isMultiplayer) {
+            const opponentBarX = width - healthBarWidth - 20;
+            const opponentBarY = 85;
+            if (this.opponentHealthLabel) this.opponentHealthLabel.setPosition(opponentBarX, opponentBarY - 18);
+            if (this.opponentHealthBarBg) this.opponentHealthBarBg.setPosition(opponentBarX, opponentBarY);
+            if (this.opponentHealthBarFill) this.opponentHealthBarFill.setPosition(opponentBarX + 2, opponentBarY + 2);
+        }
 
         // Reposition mobile controls if present
         if (this.isMobile) {

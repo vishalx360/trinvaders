@@ -20,6 +20,9 @@ export class MainMenu extends Scene {
     private difficultyButtons: GameObjects.Text[] = [];
     private difficultyContainer!: GameObjects.Container;
 
+    // Multiplayer button
+    private multiplayerButton!: GameObjects.Text;
+
     constructor() {
         super('MainMenu');
     }
@@ -110,6 +113,37 @@ export class MainMenu extends Scene {
 
         this.playButton.on('pointerdown', () => {
             this.startGame();
+        });
+
+        // Multiplayer button
+        this.multiplayerButton = this.add.text(width / 2, height / 2 + 170, '[ MULTIPLAYER ]', {
+            fontFamily: 'Arial Black',
+            fontSize: '28px',
+            color: '#888888',
+            stroke: '#00ffff',
+            strokeThickness: 1
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        this.multiplayerButton.on('pointerover', () => {
+            this.multiplayerButton.setStyle({ color: '#00ffff' });
+            this.tweens.add({
+                targets: this.multiplayerButton,
+                scale: 1.1,
+                duration: 100
+            });
+        });
+
+        this.multiplayerButton.on('pointerout', () => {
+            this.multiplayerButton.setStyle({ color: '#888888' });
+            this.tweens.add({
+                targets: this.multiplayerButton,
+                scale: 1,
+                duration: 100
+            });
+        });
+
+        this.multiplayerButton.on('pointerdown', () => {
+            this.startMultiplayer();
         });
 
         // Instructions
@@ -289,6 +323,18 @@ export class MainMenu extends Scene {
         });
     }
 
+    startMultiplayer() {
+        // Play click sound
+        this.soundManager.playClick();
+
+        // Fade out and go to lobby
+        this.cameras.main.fadeOut(500, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+            this.soundManager.destroy();
+            this.scene.start('Lobby');
+        });
+    }
+
     changeScene() {
         this.startGame();
     }
@@ -309,6 +355,9 @@ export class MainMenu extends Scene {
 
         // Reposition play button
         if (this.playButton) this.playButton.setPosition(width / 2, height / 2 + 100);
+
+        // Reposition multiplayer button
+        if (this.multiplayerButton) this.multiplayerButton.setPosition(width / 2, height / 2 + 170);
 
         // Reposition instructions at bottom
         if (this.controlsText) this.controlsText.setPosition(width / 2, height - 100);

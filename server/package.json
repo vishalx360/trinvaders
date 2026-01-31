@@ -1,0 +1,12 @@
+{
+  "name": "trinvaders-signaling",
+  "version": "1.0.0",
+  "description": "WebRTC signaling server for TRINVADERS multiplayer",
+  "main": "signaling.js",
+  "scripts": {
+    "start": "node signaling.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.7.4"
+  }
+}

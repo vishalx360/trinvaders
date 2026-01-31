@@ -4,8 +4,11 @@ import { EventBus } from '../EventBus';
 export class GameOver extends Scene {
     private background!: GameObjects.Image;
     private score: number = 0;
+    private isMultiplayer: boolean = false;
+    private won: boolean = false;
     private gameOverText!: GameObjects.Text;
     private scoreText!: GameObjects.Text;
+    private resultText!: GameObjects.Text;
     private restartButton!: GameObjects.Text;
     private menuButton!: GameObjects.Text;
 
@@ -13,8 +16,10 @@ export class GameOver extends Scene {
         super('GameOver');
     }
 
-    init(data: { score?: number }) {
+    init(data: { score?: number; isMultiplayer?: boolean; won?: boolean }) {
         this.score = data.score || 0;
+        this.isMultiplayer = data.isMultiplayer || false;
+        this.won = data.won || false;
     }
 
     create() {
@@ -34,11 +39,17 @@ export class GameOver extends Scene {
         // Listen for resize events
         this.scale.on('resize', this.handleResize, this);
 
-        // Game Over text
-        this.gameOverText = this.add.text(width / 2, height / 2 - 100, 'GAME OVER', {
+        // Game Over text - different for multiplayer
+        const titleText = this.isMultiplayer ? (this.won ? 'VICTORY!' : 'DEFEAT') : 'GAME OVER';
+        const titleColor = this.isMultiplayer ? (this.won ? '#00ff00' : '#ff0000') : '#ff0000';
+        const bgTint = this.isMultiplayer ? (this.won ? 0x003300 : 0x330000) : 0x330000;
+
+        this.background.setTint(bgTint);
+
+        this.gameOverText = this.add.text(width / 2, height / 2 - 120, titleText, {
             fontFamily: 'Arial Black',
             fontSize: '64px',
-            color: '#ff0000',
+            color: titleColor,
             stroke: '#000000',
             strokeThickness: 6,
             shadow: {
@@ -60,6 +71,16 @@ export class GameOver extends Scene {
             repeat: -1,
             ease: 'Sine.easeInOut'
         });
+
+        // Multiplayer result text
+        if (this.isMultiplayer) {
+            const resultMessage = this.won ? 'You destroyed your opponent!' : 'Your ship was destroyed!';
+            this.resultText = this.add.text(width / 2, height / 2 - 50, resultMessage, {
+                fontFamily: 'Arial',
+                fontSize: '24px',
+                color: '#cccccc'
+            }).setOrigin(0.5);
+        }
 
         // Score display
         this.scoreText = this.add.text(width / 2, height / 2, `FINAL SCORE: ${this.score}`, {
@@ -160,7 +181,12 @@ export class GameOver extends Scene {
     restartGame() {
         this.cameras.main.fadeOut(300, 0, 0, 0);
         this.cameras.main.once('camerafadeoutcomplete', () => {
-            this.scene.start('Game');
+            // Go to lobby for multiplayer, directly to game for single player
+            if (this.isMultiplayer) {
+                this.scene.start('Lobby');
+            } else {
+                this.scene.start('Game');
+            }
         });
     }
 
@@ -186,7 +212,8 @@ export class GameOver extends Scene {
         }
 
         // Reposition UI elements
-        if (this.gameOverText) this.gameOverText.setPosition(width / 2, height / 2 - 100);
+        if (this.gameOverText) this.gameOverText.setPosition(width / 2, height / 2 - 120);
+        if (this.resultText) this.resultText.setPosition(width / 2, height / 2 - 50);
         if (this.scoreText) this.scoreText.setPosition(width / 2, height / 2);
         if (this.restartButton) this.restartButton.setPosition(width / 2, height / 2 + 100);
         if (this.menuButton) this.menuButton.setPosition(width / 2, height / 2 + 160);
