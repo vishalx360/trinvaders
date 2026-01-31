@@ -5,14 +5,26 @@ import { MainMenu } from './scenes/MainMenu';
 import { AUTO, Game } from 'phaser';
 import { Preloader } from './scenes/Preloader';
 
-//  Find out more information about the Game Config at:
-//  https://newdocs.phaser.io/docs/3.70.0/Phaser.Types.Core.GameConfig
+// TRINVADERS - Multiplayer Space Shooter
+// Asteroids-style gameplay with online multiplayer support
+
 const config: Phaser.Types.Core.GameConfig = {
     type: AUTO,
-    width: 1024,
-    height: 768,
+    width: window.innerWidth,
+    height: window.innerHeight,
     parent: 'game-container',
-    backgroundColor: '#028af8',
+    backgroundColor: '#0a0a1a',
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { x: 0, y: 0 }, // Space - no gravity
+            debug: false
+        }
+    },
+    scale: {
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
     scene: [
         Boot,
         Preloader,
@@ -23,9 +35,7 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 const StartGame = (parent: string) => {
-
     return new Game({ ...config, parent });
-
 }
 
 export default StartGame;
